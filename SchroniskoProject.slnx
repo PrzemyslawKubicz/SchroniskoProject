@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Schronisko.Api/Schronisko.Api.csproj" />
+  <Project Path="Schronisko.Client/Schronisko.Client.csproj" />
+  <Project Path="Schronisko.Shared/Schronisko.Shared.csproj" />
+  <Project Path="Schronisko.Tests/Schronisko.Tests.csproj" />
+</Solution>
