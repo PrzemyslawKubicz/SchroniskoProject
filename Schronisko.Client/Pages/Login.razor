@@ -1,0 +1,72 @@
+﻿@page "/login"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@using Schronisko.Client.Auth
+
+<div class="d-flex justify-content-center align-items-center vh-100 bg-light">
+    <div class="card shadow-lg p-4" style="width: 100%; max-width: 400px; border-radius: 15px;">
+        <div class="card-body">
+            <h2 class="text-center mb-4 fw-bold text-primary">Witaj ponownie! 👋</h2>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger text-center">@errorMessage</div>
+            }
+
+            <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Login lub E-mail</label>
+                    <InputText @bind-Value="loginModel.Username" class="form-control form-control-lg" placeholder="Wpisz login..." />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Hasło</label>
+                    <div class="input-group">
+                        <InputText @bind-Value="loginModel.Password" type="@(showPassword ? "text" : "password")" class="form-control form-control-lg" placeholder="Hasło" />
+
+                        <button class="btn btn-outline-secondary" type="button" @onclick="TogglePassword">
+                            @(showPassword ? "👁️" : "🔒")
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg w-100 mt-3 shadow-sm">Zaloguj się</button>
+            </EditForm>
+
+            <div class="mt-4 text-center">
+                <span class="text-muted">Nie masz konta?</span>
+                <a href="register" class="fw-bold text-decoration-none">Zarejestruj się</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserLoginDto loginModel = new UserLoginDto();
+    private string errorMessage = "";
+    private bool showPassword = false;
+
+    private void TogglePassword()
+    {
+        showPassword = !showPassword;
+    }
+
+    private async Task HandleLogin()
+    {
+        var response = await Http.PostAsJsonAsync("api/auth/login", loginModel);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var token = await response.Content.ReadAsStringAsync();
+            await ((CustomAuthStateProvider)AuthStateProvider).Login(token);
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Błędny login lub hasło.";
+        }
+    }
+}

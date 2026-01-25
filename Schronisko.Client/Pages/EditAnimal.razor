@@ -1,0 +1,176 @@
+﻿@page "/edit-animal/{Id:int}"
+@using Schronisko.Shared.Entities
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Headers
+@attribute [Authorize(Roles = "Admin,Employee")]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Edytuj Zwierzaka</PageTitle>
+
+<div class="container mt-4" style="max-width: 600px;">
+    <div class="card shadow border-0">
+        <div class="card-header bg-warning text-dark text-center py-3">
+            <h4 class="mb-0 fw-bold">Edycja Zwierzaka</h4>
+        </div>
+        <div class="card-body p-4">
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            @if (animal == null)
+            {
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p>Ładowanie danych...</p>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="animal" OnValidSubmit="HandleUpdate">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Imię:</label>
+                        <InputText class="form-control" @bind-Value="animal.Name" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Gatunek:</label>
+                        <InputSelect class="form-select" @bind-Value="animal.Species">
+                            <option value="Pies">Pies</option>
+                            <option value="Kot">Kot</option>
+                            <option value="Inny">Inny</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Status:</label>
+                        <InputSelect class="form-select" @bind-Value="animal.Status">
+                            <option value="Do adopcji">Do adopcji</option>
+                            <option value="Oczekujący">Oczekujący</option>
+                            <option value="Zaadoptowany">Zaadoptowany</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Wiek (lat):</label>
+                        <InputNumber class="form-control" @bind-Value="animal.Age" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Opis:</label>
+                        <InputTextArea class="form-control" @bind-Value="animal.Description" rows="4" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Zdjęcie:</label>
+
+                        <InputFile OnChange="HandleImageUpload" class="form-control" accept="image/png, image/jpeg, image/jpg" />
+                        <small class="text-muted">Maksymalny rozmiar: 5 MB. Pozostaw puste, aby zachować obecne zdjęcie.</small>
+
+                        @if (!string.IsNullOrEmpty(animal.ImageUrl))
+                        {
+                            <div class="text-center mt-3">
+                                <p class="mb-1 text-muted small">Aktualne zdjęcie / Podgląd:</p>
+                                <img src="@animal.ImageUrl" class="img-thumbnail" style="max-height: 200px;"
+                                     onerror="this.src='/images/default.png'" />
+                            </div>
+                        }
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-success">💾 Zapisz zmiany</button>
+                        <button type="button" class="btn btn-secondary" @onclick="GoBack">Anuluj</button>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Animal? animal;
+    private string errorMessage = "";
+
+    // Maksymalny rozmiar pliku (5 MB)
+    private long maxFileSize = 1024 * 1024 * 5;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            animal = await Http.GetFromJsonAsync<Animal>($"api/animals/{Id}");
+        }
+        catch (Exception)
+        {
+            await JS.InvokeVoidAsync("alert", "Nie znaleziono zwierzaka!");
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            var format = "image/jpeg";
+
+            var resizedImage = await file.RequestImageFileAsync(format, 600, 600);
+
+            var buffer = new byte[resizedImage.Size];
+            await resizedImage.OpenReadStream(maxFileSize).ReadAsync(buffer);
+
+            var base64Data = Convert.ToBase64String(buffer);
+
+            // Nadpisujemy stare zdjęcie nowym
+            if (animal != null)
+            {
+                animal.ImageUrl = $"data:{format};base64,{base64Data}";
+            }
+
+            errorMessage = ""; // Czyścimy błędy jeśli się udało
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Błąd zdjęcia: {ex.Message}";
+        }
+    }
+
+    private async Task HandleUpdate()
+    {
+        if (animal == null) return;
+
+        // Jeśli z jakiegoś powodu ImageUrl jest pusty (użytkownik usunął link w bazie?), dajemy default
+        if (string.IsNullOrEmpty(animal.ImageUrl))
+        {
+            animal.ImageUrl = "images/default.png";
+        }
+
+        var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.PutAsJsonAsync($"api/animals/{Id}", animal);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Błąd zapisu zmian. Spróbuj ponownie.";
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+}

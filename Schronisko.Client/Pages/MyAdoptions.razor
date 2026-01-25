@@ -1,0 +1,94 @@
+﻿@page "/my-adoptions"
+@using Schronisko.Shared.Entities
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Headers
+@attribute [Authorize] // Tylko dla zalogowanych
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<div class="container mt-4">
+    <h3>📂 Moje wnioski adopcyjne</h3>
+
+    @if (requests == null)
+    {
+        <p>Ładowanie...</p>
+    }
+    else if (requests.Count == 0)
+    {
+        <div class="alert alert-info">Nie złożyłeś jeszcze żadnych wniosków. <a href="">Wróć na stronę główną</a></div>
+    }
+    else
+    {
+        <table class="table table-hover mt-3">
+            <thead class="table-light">
+                <tr>
+                    <th>Data</th>
+                    <th>Zwierzak</th>
+                    <th>Twój powód</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var req in requests)
+                {
+                    <tr>
+                        <td>@req.RequestDate.ToShortDateString()</td>
+                        <td>
+                            @if (req.Animal != null)
+                            {
+                                <strong>@req.Animal.Name</strong> <span class="text-muted">(@req.Animal.Species)</span>
+                            }
+                            else
+                            {
+                                <span>(Zwierzak usunięty)</span>
+                            }
+                        </td>
+                        <td>@req.Reason</td>
+                        <td>
+                            <span class="badge @GetBadgeClass(req.Status)">@req.Status</span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<AdoptionRequest>? requests;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 1. Pobieramy token (bo HttpClient go potrzebuje)
+        var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
+        if (string.IsNullOrEmpty(token))
+        {
+            Navigation.NavigateTo("login");
+            return;
+        }
+
+        // 2. Ustawiamy nagłówek
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // 3. Pobieramy "Moje Wnioski"
+        try
+        {
+            requests = await Http.GetFromJsonAsync<List<AdoptionRequest>>("api/adoptionrequests/my");
+        }
+        catch (Exception)
+        {
+            // Obsługa błędu (np. wygasła sesja)
+        }
+    }
+
+    private string GetBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Zatwierdzony" => "bg-success",
+            "Odrzucony" => "bg-danger",
+            _ => "bg-warning text-dark"
+        };
+    }
+}

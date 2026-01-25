@@ -1,0 +1,81 @@
+﻿@using Schronisko.Client.Auth
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Schronisko 🐶</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="oi oi-home" aria-hidden="true"></span> Strona Główna
+            </NavLink>
+        </div>
+
+        <AuthorizeView Roles="Admin,Employee">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="admin-dashboard">
+                    <span class="bi bi-speedometer2" aria-hidden="true"></span> Panel Zarządzania
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="add-animal">
+                    <span class="bi bi-plus-circle" aria-hidden="true"></span> Dodaj Zwierzaka
+                </NavLink>
+            </div>
+        </AuthorizeView>
+
+        <AuthorizeView Roles="Admin">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="logs">
+                    <span class="bi bi-journal-code" aria-hidden="true"></span> Logi Systemowe
+                </NavLink>
+            </div>
+        </AuthorizeView>
+
+        <AuthorizeView Roles="User">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="my-adoptions">
+                    <span class="oi oi-folder" aria-hidden="true"></span> Moje Wnioski
+                </NavLink>
+            </div>
+        </AuthorizeView>
+
+        <AuthorizeView>
+            <Authorized>
+                <div class="nav-item px-3">
+                    <button class="nav-link btn btn-link text-white" @onclick="Logout">
+                        <span class="oi oi-account-logout" aria-hidden="true"></span> Wyloguj (@context.User.Identity?.Name)
+                    </button>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="login">
+                        <span class="oi oi-account-login" aria-hidden="true"></span> Zaloguj
+                    </NavLink>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
+
+    private async Task Logout()
+    {
+        await ((CustomAuthStateProvider)AuthStateProvider).Logout();
+        Navigation.NavigateTo("/");
+    }
+}

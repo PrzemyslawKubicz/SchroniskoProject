@@ -1,0 +1,134 @@
+﻿@page "/add-animal"
+@using Schronisko.Shared.Entities
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Headers
+@attribute [Authorize(Roles = "Admin,Employee")]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<div class="container mt-4" style="max-width: 600px;">
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-primary text-white text-center py-3">
+            <h4 class="mb-0 fw-bold">🐾 Dodaj nowego zwierzaka</h4>
+        </div>
+        <div class="card-body p-4">
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            <EditForm Model="animal" OnValidSubmit="HandleAddAnimal">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Imię</label>
+                    <InputText @bind-Value="animal.Name" class="form-control" placeholder="Np. Burek" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Gatunek</label>
+                    <InputSelect @bind-Value="animal.Species" class="form-select">
+                        <option value="">-- Wybierz --</option>
+                        <option value="Pies">Pies</option>
+                        <option value="Kot">Kot</option>
+                        <option value="Inny">Inny</option>
+                    </InputSelect>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Wiek (lat)</label>
+                    <InputNumber @bind-Value="animal.Age" class="form-control" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Opis</label>
+                    <InputTextArea @bind-Value="animal.Description" class="form-control" rows="3" placeholder="Krótki opis..." />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Zdjęcie</label>
+
+                    <InputFile OnChange="HandleImageUpload" class="form-control" accept="image/png, image/jpeg, image/jpg" />
+
+                    <small class="text-muted">Maksymalny rozmiar: 5 MB. Zdjęcie zostanie automatycznie zmniejszone.</small>
+                </div>
+
+                @if (!string.IsNullOrEmpty(animal.ImageUrl))
+                {
+                    <div class="text-center mb-4">
+                        <p class="mb-1 text-muted">Podgląd:</p>
+                        <img src="@animal.ImageUrl" class="img-fluid rounded shadow-sm" style="max-height: 200px;" alt="Podgląd" />
+                    </div>
+                }
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">💾 Zapisz zwierzaka</button>
+                    <a href="admin" class="btn btn-outline-secondary">Anuluj</a>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Animal animal = new Animal();
+    private string errorMessage = "";
+
+    // Maksymalny rozmiar pliku (5 MB)
+    private long maxFileSize = 1024 * 1024 * 5;
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+
+            // 1. Zabezpieczenie: Sprawdź format
+            var format = "image/jpeg"; // Domyślnie konwertujemy wszystko na jpg
+
+            // 2. Skalowanie obrazu (Ważne! Żeby nie wysyłać zdjęć 4K do bazy)
+            // Zmieniamy rozmiar do max 600x600 px
+            var resizedImage = await file.RequestImageFileAsync(format, 600, 600);
+
+            // 3. Czytanie strumienia do pamięci
+            var buffer = new byte[resizedImage.Size];
+            await resizedImage.OpenReadStream(maxFileSize).ReadAsync(buffer);
+
+            // 4. Konwersja na Base64 (Tekst)
+            var base64Data = Convert.ToBase64String(buffer);
+
+            // 5. Zapisanie do modelu jako URL ("data:image/jpeg;base64,.....")
+            animal.ImageUrl = $"data:{format};base64,{base64Data}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Błąd podczas przetwarzania zdjęcia: {ex.Message}";
+        }
+    }
+
+    private async Task HandleAddAnimal()
+    {
+        // Jeśli użytkownik nie wybrał zdjęcia, wstawiamy domyślne (placeholder)
+        if (string.IsNullOrEmpty(animal.ImageUrl))
+        {
+            animal.ImageUrl = "images/default.png";
+        }
+
+        var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.PostAsJsonAsync("api/animals", animal);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Nie udało się dodać zwierzaka. Sprawdź dane.";
+        }
+    }
+}

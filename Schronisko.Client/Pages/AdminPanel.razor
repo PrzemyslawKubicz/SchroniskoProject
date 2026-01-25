@@ -1,0 +1,208 @@
+﻿@page "/admin-dashboard"
+@using Schronisko.Shared.Entities
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Headers 
+@attribute [Authorize(Roles = "Admin,Employee")]
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<div class="container mt-4">
+    <h2 class="mb-4">Panel Zarządzania</h2>
+
+    @if (stats != null)
+    {
+        <div class="row mb-5">
+            <div class="col-md-4">
+                <div class="card text-white bg-success mb-3 shadow">
+                    <div class="card-header">🐶 Do adopcji</div>
+                    <div class="card-body">
+                        <h1 class="card-title text-center display-4 fw-bold">@stats.AvailableCount</h1>
+                        <p class="card-text text-center">Dostępnych zwierząt</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card text-white bg-primary mb-3 shadow">
+                    <div class="card-header">🏠 Znalazło dom</div>
+                    <div class="card-body">
+                        <h1 class="card-title text-center display-4 fw-bold">@stats.AdoptedCount</h1>
+                        <p class="card-text text-center">Szczęśliwych adopcji</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card text-dark bg-warning mb-3 shadow">
+                    <div class="card-header">⏳ Decyzje do podjęcia</div>
+                    <div class="card-body">
+                        <h1 class="card-title text-center display-4 fw-bold">@stats.PendingRequests</h1>
+                        <p class="card-text text-center">Oczekujących wniosków</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center mb-4">
+            <div class="spinner-border text-secondary me-2" role="status"></div>
+            <span>Ładowanie raportów...</span>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert alert-info">@message</div>
+    }
+
+    <h4 class="mb-3">Lista Wniosków Adopcyjnych</h4>
+
+    @if (requests == null)
+    {
+        <div class="spinner-border text-primary" role="status"></div>
+        <p>Ładowanie wniosków...</p>
+    }
+    else if (requests.Count == 0)
+    {
+        <div class="alert alert-warning">Brak złożonych wniosków.</div>
+    }
+    else
+    {
+        <table class="table table-striped table-hover shadow-sm">
+            <thead class="bg-dark text-white">
+                <tr>
+                    <th>Data</th>
+                    <th>Zwierzę</th>
+                    <th>Kandydat</th>
+                    <th>Powód adopcji</th>
+                    <th>Status</th>
+                    <th>Akcje</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var req in requests)
+                {
+                    <tr>
+                        <td>@req.RequestDate.ToShortDateString()</td>
+                        <td>
+                            @if (req.Animal != null)
+                            {
+                                <strong>@req.Animal.Name</strong> <span class="text-muted">(@req.Animal.Species)</span>
+                            }
+                            else
+                            {
+                                <span>(Pies usunięty)</span>
+                            }
+                        </td>
+                        <td>
+                            @if (req.User != null)
+                            {
+                                <div>👤 <strong>@req.User.Username</strong></div>
+                                <small class="text-muted">@req.User.Email</small>
+                            }
+                            else
+                            {
+                                <span class="text-danger">Nieznany (ID: @req.UserId)</span>
+                            }
+                        </td>
+                        <td>@req.Reason</td>
+                        <td>
+                            <span class="badge @GetBadgeClass(req.Status)">@req.Status</span>
+                        </td>
+                        <td>
+                            @if (req.Status == "Oczekujący" || req.Status == "Pending")
+                            {
+                                <button class="btn btn-success btn-sm me-2" @onclick='() => UpdateStatus(req.Id, "Zatwierdzony")'>✅ Zatwierdź</button>
+                                <button class="btn btn-danger btn-sm" @onclick='() => UpdateStatus(req.Id, "Odrzucony")'>❌ Odrzuć</button>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">Rozpatrzony</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<AdoptionRequest>? requests;
+    private ShelterStatsDto? stats; // Zmienna na raporty
+    private string message = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            // Pobieramy token, bo api/stats i api/requests są chronione
+            var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            // 1. Pobierz listę wniosków
+            requests = await Http.GetFromJsonAsync<List<AdoptionRequest>>("api/adoptionrequests");
+
+            // 2. Pobierz RAPORTY (Statystyki)
+            // To wywołuje Twój StatsController, który korzysta z procedury SQL
+            stats = await Http.GetFromJsonAsync<ShelterStatsDto>("api/stats");
+        }
+        catch (Exception ex)
+        {
+            message = $"Błąd ładowania danych: {ex.Message}";
+        }
+    }
+
+    private async Task UpdateStatus(int id, string status)
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/adoptionrequests/{id}", status);
+
+            if (response.IsSuccessStatusCode)
+            {
+                message = $"Status zmieniony na: {status}";
+                // Odśwież wszystko (wnioski i liczniki w raporcie)
+                await LoadData();
+            }
+            else
+            {
+                message = "Błąd aktualizacji statusu.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Błąd połączenia: {ex.Message}";
+        }
+    }
+
+    private string GetBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Zatwierdzony" => "bg-success",
+            "Approved" => "bg-success",
+            "Odrzucony" => "bg-danger",
+            "Rejected" => "bg-danger",
+            "Oczekujący" => "bg-warning text-dark",
+            "Pending" => "bg-warning text-dark",
+            _ => "bg-secondary"
+        };
+    }
+
+    // Klasa pomocnicza (DTO) do odbioru statystyk z API
+    public class ShelterStatsDto
+    {
+        public int AvailableCount { get; set; }
+        public int AdoptedCount { get; set; }
+        public int PendingRequests { get; set; }
+    }
+}

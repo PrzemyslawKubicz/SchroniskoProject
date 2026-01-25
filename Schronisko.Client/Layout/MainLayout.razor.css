@@ -1,0 +1,46 @@
+﻿.page {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+/* --- PASEK BOCZNY (SIDEBAR) --- */
+.sidebar {
+    /* To ustawia nasz pomarańczowy gradient */
+    background-image: linear-gradient(180deg, #e67e22 0%, #d35400 70%);
+    color: white;
+}
+
+/* --- UKŁAD NA DESKTOPIE (Ekrany > 641px) --- */
+@media (min-width: 641px) {
+    .page {
+        flex-direction: row;
+    }
+
+    .sidebar {
+        width: 250px;
+        height: 100vh; /* Pasek na całą wysokość */
+        position: sticky;
+        top: 0;
+    }
+
+    .top-row {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .top-row, article {
+        padding-left: 2rem !important;
+        padding-right: 1.5rem !important;
+    }
+}
+
+/* Styl dla linków w treści (opcjonalnie) */
+a, .btn-link {
+    color: #e67e22;
+}
