@@ -14,16 +14,43 @@ namespace Schronisko.Api.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Konfiguracja Triggera
+            // =========================================================
+            // 1. KONFIGURACJA FUNKCJI I KOLUMN OBLICZANYCH
+            // =========================================================
+            modelBuilder.Entity<Animal>()
+                .Property(a => a.DaysInShelter)
+                .HasComputedColumnSql("dbo.fn_DaysInShelter(DateAdded)");
+
+            // =========================================================
+            // 2. KONFIGURACJA TRIGGERÓW
+            // =========================================================
             modelBuilder.Entity<AdoptionRequest>()
                 .ToTable(tb => tb.HasTrigger("trg_ApproveAdoption"));
 
-            // Konfiguracja relacji User <-> Wnioski
-            // Jeden użytkownik może mieć wiele wniosków
+            // =========================================================
+            // 3. KONFIGURACJA RELACJI (Fluent API)
+            // =========================================================
+
+            // --- Relacja: User (1) <-> Wnioski (N) ---
             modelBuilder.Entity<AdoptionRequest>()
-                .HasOne(r => r.User)       // Wniosek ma jednego autora
-                .WithMany()           // User ma wiele wniosków (bez nawigacji w drugą stronę)
-                .HasForeignKey(r => r.UserId); // Kluczem obcym jest UserId
+                .HasOne(r => r.User)
+                .WithMany() // Zakładamy, że User nie ma listy "Wnioski" w modelu, jeśli ma - wpisz .WithMany(u => u.AdoptionRequests)
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Restrict); // Ważne! Nie usuwamy wniosków kaskadowo, żeby nie stracić historii
+
+            // --- Relacja: Zwierzak (1) <-> Wnioski (N) ---
+            modelBuilder.Entity<AdoptionRequest>()
+                .HasOne(r => r.Animal)
+                .WithMany()
+                .HasForeignKey(r => r.AnimalId)
+                .OnDelete(DeleteBehavior.Cascade); // Usunięcie zwierzaka usuwa wnioski (lub Restrict, zależnie od logiki)
+
+            // --- Relacja: User (1) <-> Logi (N) ---
+            modelBuilder.Entity<Log>()
+                .HasOne(l => l.User)
+                .WithMany()
+                .HasForeignKey(l => l.UserId)
+                .OnDelete(DeleteBehavior.SetNull); // Jak usuniesz Usera, Log zostaje (ale bez ID), żeby zachować historię
         }
     }
 }

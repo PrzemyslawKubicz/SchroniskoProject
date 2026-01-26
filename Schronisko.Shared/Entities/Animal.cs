@@ -24,7 +24,7 @@ namespace Schronisko.Shared.Entities
 
         public DateTime DateAdded { get; set; } = DateTime.Now;
 
-        [NotMapped]
+        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
         public int DaysInShelter { get; set; }
     }
 }
