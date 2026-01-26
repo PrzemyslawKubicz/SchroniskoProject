@@ -53,7 +53,8 @@ Rozwiązanie zostało podzielone na trzy projekty zgodnie z zasadą *Separation 
 System opiera się na relacyjnej bazie danych SQL Server składającej się z 4 głównych tabel powiązanych relacjami (Klucze Obce).
 
 ### 3.1. Schemat ERD
-<img width="522" height="644" alt="erd" src="https://github.com/user-attachments/assets/791cce56-4207-48c4-aa6f-4041cb169a89" />
+<img width="522" height="644" alt="erd" src="https://github.com/user-attachments/assets/0d1269ed-7615-4e12-bf5e-0aab91831e7d" />
+
 
 
 ### 3.2. Obiekty Programowalne SQL (Zaawansowane)
@@ -75,23 +76,22 @@ W celu optymalizacji i zapewnienia integralności danych, kluczowa logika zosta�
 
 ### 4.1. Strona Główna (Katalog)
 Widok dostępny dla każdego użytkownika. Umożliwia filtrowanie i wyszukiwanie.
-<img width="1600" height="781" alt="home" src="https://github.com/user-attachments/assets/52f970af-72bf-46a9-8d7d-5a31ac13ef2a" />
+<img width="1600" height="781" alt="home" src="https://github.com/user-attachments/assets/13402845-87e5-45cd-9542-3f7625153e20" />
 
 
 ### 4.2. Panel Zarządzania (Dashboard)
 Widok statystyk i zarządzania wnioskami (dla personelu).
-<img width="1600" height="779" alt="image" src="https://github.com/user-attachments/assets/ce63128d-3998-4292-a648-b2596e9f36af" />
+<img width="1557" height="762" alt="dashboard" src="https://github.com/user-attachments/assets/6a06b392-7b23-4732-93a5-9918bf3ca2d0" />
 
 
 ### 4.3. Edycja Zwierzęcia
 Formularz zarządzania danymi z walidacją.
-<img width="1600" height="783" alt="edit" src="https://github.com/user-attachments/assets/0a005e41-1c0f-487a-abb1-1662ac11864d" />
+<img width="1600" height="783" alt="edit" src="https://github.com/user-attachments/assets/54233f78-663c-4638-bf40-e12e819e7cff" />
 
 
 ### 4.4. Logi Systemowe
 Widok audytu dostępny tylko dla Administratora.
-<img width="1600" height="782" alt="logs" src="https://github.com/user-attachments/assets/a1ef9e3a-3dcc-489a-b2c0-f672932ef8f9" />
-
+<img width="1600" height="782" alt="logs" src="https://github.com/user-attachments/assets/15192902-c516-4f76-8829-08c0222ead16" />
 
 ---
 
@@ -114,7 +114,8 @@ Zrealizowano 5 kluczowych scenariuszy w klasie `ScroniskoTests`:
 
 ### 5.3. Wyniki
 Wszystkie testy zakończyły się wynikiem pozytywnym.
-<img width="792" height="399" alt="testy" src="https://github.com/user-attachments/assets/ee5b6c30-05f0-433f-b52e-a5b41e58008f" />
+<img width="792" height="399" alt="testy" src="https://github.com/user-attachments/assets/9e701b32-193c-4d04-97ec-4c627fb7602a" />
+
 
 ---
 
