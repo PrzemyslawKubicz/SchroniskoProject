@@ -15,7 +15,7 @@ namespace Schronisko.Shared.Entities
         public string Reason { get; set; } = string.Empty;
 
         // --- RELACJA ZE ZWIERZĘCIEM ---
-        public int AnimalId { get; set; }
+        public int? AnimalId { get; set; }
         public Animal? Animal { get; set; }
 
         // --- RELACJA Z UŻYTKOWNIKIEM ---

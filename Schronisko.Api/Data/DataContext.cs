@@ -30,20 +30,12 @@ namespace Schronisko.Api.Data
             // =========================================================
             // 3. KONFIGURACJA RELACJI (Fluent API)
             // =========================================================
-
-            // --- Relacja: User (1) <-> Wnioski (N) ---
-            modelBuilder.Entity<AdoptionRequest>()
-                .HasOne(r => r.User)
-                .WithMany() // Zakładamy, że User nie ma listy "Wnioski" w modelu, jeśli ma - wpisz .WithMany(u => u.AdoptionRequests)
-                .HasForeignKey(r => r.UserId)
-                .OnDelete(DeleteBehavior.Restrict); // Ważne! Nie usuwamy wniosków kaskadowo, żeby nie stracić historii
-
             // --- Relacja: Zwierzak (1) <-> Wnioski (N) ---
             modelBuilder.Entity<AdoptionRequest>()
                 .HasOne(r => r.Animal)
                 .WithMany()
                 .HasForeignKey(r => r.AnimalId)
-                .OnDelete(DeleteBehavior.Cascade); // Usunięcie zwierzaka usuwa wnioski (lub Restrict, zależnie od logiki)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // --- Relacja: User (1) <-> Logi (N) ---
             modelBuilder.Entity<Log>()
