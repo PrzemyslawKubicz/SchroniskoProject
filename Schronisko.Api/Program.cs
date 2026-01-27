@@ -9,12 +9,12 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// === 1. KONTROLERY (TUTAJ BY£ BRAK) ===
-// Dodajemy obs≥ugÍ IgnoreCycles, øeby API nie d≥awi≥o siÍ relacjami w bazie
+// === 1. KONTROLERY  ===
+// Dodajemy obs≈Çugƒô IgnoreCycles, ≈ºeby API nie d≈Çawi≈Ço siƒô relacjami w bazie
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    // To pozwala API wysy≥aÊ zagnieødøone obiekty (Wniosek -> User)
-    // i zapobiega b≥Ídom, jeúli obiekty wskazujπ na siebie nawzajem
+    // To pozwala API wysy≈Çaƒá zagnie≈ºd≈ºone obiekty (Wniosek -> User)
+    // i zapobiega b≈Çƒôdom, je≈õli obiekty wskazujƒÖ na siebie nawzajem
     options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
 });
 
@@ -86,25 +86,21 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<DataContext>();
 
-        // ZMIANA: Zamiast EnsureCreated, uøywamy Migrate().
-        // To sprawia, øe EF Core uruchomi WSZYSTKIE Twoje pliki z folderu Migrations po kolei.
-        // DziÍki temu trafiπ do bazy teø Triggery i Procedury!
+        // To sprawia, ≈ºe EF Core uruchomi WSZYSTKIE Twoje pliki z folderu Migrations po kolei.
+        // Dziƒôki temu trafiƒÖ do bazy te≈º Triggery i Procedury!
         context.Database.Migrate();
         Console.WriteLine("--> Aktualizacja bazy danych (Migracje)...");
 
-        // Opcjonalnie: UsuÒ bazÍ, jeúli chcesz zaczπÊ na czysto (odkomentuj poniøsze 2 linie)
-        //context.Database.EnsureDeleted();
-        //Console.WriteLine("--> Stara baza usuniÍta.");
-
-        // Seedowanie danych (Admin, User, ZwierzÍta)
+        // Seedowanie danych (Wype≈Çnienie bazy na start)
+        // Je≈õli baza jest pusta, Seed.SeedData() wstawi Admina, Usera i Zwierzaki.
         Console.WriteLine("--> Seedowanie danych...");
         Seed.SeedData(context);
 
-        Console.WriteLine("--> GOTOWE! Baza dzia≥a.");
+        Console.WriteLine("--> GOTOWE! Baza dzia≈Ça.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"!!! B£•D BAZY: {ex.Message}");
+        Console.WriteLine($"!!! B≈ÅƒÑD BAZY: {ex.Message}");
     }
 }
 
