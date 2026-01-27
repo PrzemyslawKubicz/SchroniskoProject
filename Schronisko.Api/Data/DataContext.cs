@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Schronisko.Shared.Entities;
 
 namespace Schronisko.Api.Data
@@ -15,14 +15,21 @@ namespace Schronisko.Api.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // =========================================================
-            // 1. KONFIGURACJA FUNKCJI I KOLUMN OBLICZANYCH
+            // 1. KONFIGURACJA ZWIERZĄT (FIX BŁĘDU EDYCJI)
             // =========================================================
-            modelBuilder.Entity<Animal>()
-                .Property(a => a.DaysInShelter)
-                .HasComputedColumnSql("dbo.fn_DaysInShelter(DateAdded)");
+            modelBuilder.Entity<Animal>(entity =>
+            {
+                // Mówimy EF Core, że ta tabela ma trigger (nawet jeśli to tylko flaga).
+                // To wymusza bezpieczny tryb zapisu bez użycia klauzuli OUTPUT.
+                entity.ToTable(tb => tb.HasTrigger("trg_EF_Fix_ComputedColumn"));
+
+                // Konfiguracja kolumny obliczanej (funkcja SQL)
+                entity.Property(a => a.DaysInShelter)
+                      .HasComputedColumnSql("dbo.fn_DaysInShelter(DateAdded)");
+            });
 
             // =========================================================
-            // 2. KONFIGURACJA TRIGGERÓW
+            // 2. KONFIGURACJA TRIGGERÓW (WNIOSKI)
             // =========================================================
             modelBuilder.Entity<AdoptionRequest>()
                 .ToTable(tb => tb.HasTrigger("trg_ApproveAdoption"));
@@ -30,6 +37,7 @@ namespace Schronisko.Api.Data
             // =========================================================
             // 3. KONFIGURACJA RELACJI (Fluent API)
             // =========================================================
+            
             // --- Relacja: Zwierzak (1) <-> Wnioski (N) ---
             modelBuilder.Entity<AdoptionRequest>()
                 .HasOne(r => r.Animal)
@@ -42,7 +50,7 @@ namespace Schronisko.Api.Data
                 .HasOne(l => l.User)
                 .WithMany()
                 .HasForeignKey(l => l.UserId)
-                .OnDelete(DeleteBehavior.SetNull); 
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }
