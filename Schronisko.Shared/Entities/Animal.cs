@@ -20,10 +20,14 @@ namespace Schronisko.Shared.Entities
 
         public string? ImageUrl { get; set; } // Do zdjęcia
 
-        public string Status { get; set; } = "Do adopcji"; // Do adopcji, Oczekujący, Zaadoptowany
+        // Domyślnie status to "Do adopcji"
+        public string Status { get; set; } = "Do adopcji";
 
+        // Domyślnie data to "TERAZ". 
+        // W Seedzie ją nadpisujemy (cofamy), ale przy normalnym dodawaniu psa przez stronę ta wartość zadziała automatycznie.
         public DateTime DateAdded { get; set; } = DateTime.Now;
 
+        // To pole nie jest zapisywane jako liczba w tabeli, tylko obliczane przez SQL (przez funkcję fn_DaysInShelter)
         [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
         public int DaysInShelter { get; set; }
     }

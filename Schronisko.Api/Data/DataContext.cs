@@ -42,7 +42,7 @@ namespace Schronisko.Api.Data
                 .HasOne(l => l.User)
                 .WithMany()
                 .HasForeignKey(l => l.UserId)
-                .OnDelete(DeleteBehavior.SetNull); // Jak usuniesz Usera, Log zostaje (ale bez ID), żeby zachować historię
+                .OnDelete(DeleteBehavior.SetNull); 
         }
     }
 }
