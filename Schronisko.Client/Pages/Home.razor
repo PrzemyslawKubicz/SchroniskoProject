@@ -1,23 +1,20 @@
 ﻿@page "/"
 @using Schronisko.Shared.Entities
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components.Authorization
 @using System.Net.Http.Headers
 @inject HttpClient Http
 @inject NavigationManager Navigation
-@inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
 
 <PageTitle>Schronisko - Strona Główna</PageTitle>
 
-<div class="hero-section text-center">
-    <h1 class="display-3 fw-bold">Witaj na stronie schroniska! 🐶🐱</h1>
-    <p class="lead fs-4">Twój nowy najlepszy przyjaciel czeka na Ciebie.</p>
-    <a href="#animals-list" class="btn btn-primary btn-lg mt-3">Znajdź zwierzaka</a>
+@* --- SEKCJA HERO --- *@
+<div class="hero-section text-center mb-4">
+    <h1 class="display-4 fw-bold">Witaj w Schronisku! 🐾</h1>
+    <p class="lead">Znajdź przyjaciela lub pomóż nam w opiece.</p>
 </div>
 
-<div id="animals-list"></div>
-
+@* --- KOMUNIKATY (ALERTY) --- *@
 @if (!string.IsNullOrEmpty(message))
 {
     <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
@@ -26,14 +23,14 @@
     </div>
 }
 
-<div class="row mb-4 justify-content-center">
+@* --- GÓRNY PASEK: Wyszukiwarka + Przycisk Dodawania (Tylko Admin/Pracownik) --- *@
+<div class="row mb-4 align-items-center">
     <div class="col-md-8">
         <div class="input-group shadow-sm">
             <span class="input-group-text bg-white border-0">🔍</span>
-            <input type="text" class="form-control border-0" placeholder="Szukaj po imieniu..."
+            <input type="text" class="form-control border-0" placeholder="Szukaj zwierzaka..."
                    @bind="searchText" @bind:event="oninput" @onkeyup="FilterAnimals" />
-
-            <select class="form-select border-0" style="max-width: 200px; border-left: 1px solid #eee;" @onchange="OnSpeciesChanged">
+            <select class="form-select border-0" style="max-width: 150px;" @onchange="OnSpeciesChanged">
                 <option value="">Wszystkie</option>
                 <option value="Pies">Pies</option>
                 <option value="Kot">Kot</option>
@@ -41,18 +38,24 @@
             </select>
         </div>
     </div>
+
+    <div class="col-md-4 text-end">
+        <AuthorizeView Roles="Admin,Employee">
+            <button class="btn btn-success shadow-sm" @onclick="OpenAddModal">
+                ➕ Dodaj Zwierzaka
+            </button>
+        </AuthorizeView>
+    </div>
 </div>
 
+@* --- LISTA ZWIERZĄT (READ & DELETE) --- *@
 @if (filteredAnimals == null)
 {
-    <div class="text-center py-5">
-        <div class="spinner-border text-primary" role="status"></div>
-        <p class="mt-2 text-muted">Ładowanie zwierzaków...</p>
-    </div>
+    <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
 }
 else if (filteredAnimals.Count == 0)
 {
-    <div class="alert alert-warning text-center">Nie znaleziono zwierząt spełniających kryteria.</div>
+    <div class="alert alert-info text-center">Brak zwierząt do wyświetlenia.</div>
 }
 else
 {
@@ -61,6 +64,7 @@ else
         {
             <div class="col-md-4 mb-4">
                 <div class="card h-100 shadow-sm hover-shadow">
+                    @* Obsługa obrazka na liście *@
                     <img src="@animal.ImageUrl" class="card-img-top" alt="@animal.Name"
                          style="height: 250px; object-fit: cover;"
                          onerror="this.src='/images/default.png'">
@@ -68,7 +72,7 @@ else
                     <div class="card-body d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h5 class="card-title mb-0 fw-bold">@animal.Name</h5>
-                            <span class="badge @GetStatusBadge(animal.Status)">@animal.Status</span>
+                            <span class="badge @GetBadge(animal.Status)">@animal.Status</span>
                         </div>
 
                         <h6 class="card-subtitle mb-2 text-muted">@animal.Species • @animal.Age lat(a)</h6>
@@ -86,41 +90,31 @@ else
                                 }
                             </strong>
                         </p>
-                        <p class="card-text text-muted">@animal.Description</p>
 
+                        <p class="card-text text-muted text-truncate">@animal.Description</p>
+                        
                         <div class="mt-auto pt-3">
-
                             <AuthorizeView Roles="Admin,Employee">
-                                <a href="edit-animal/@animal.Id" class="btn btn-outline-warning btn-sm w-100 mb-2">
-                                    Edytuj
-                                </a>
+                                <button class="btn btn-outline-warning btn-sm w-100 mb-2" @onclick="() => OpenEditModal(animal)">✏️ Edytuj</button>
                             </AuthorizeView>
 
                             <AuthorizeView Roles="Admin">
-                                <button class="btn btn-outline-danger btn-sm w-100 mb-2" @onclick="() => DeleteAnimal(animal.Id)">
-                                    Usuń
-                                </button>
+                                <button class="btn btn-outline-danger btn-sm w-100 mb-2" @onclick="() => DeleteAnimal(animal.Id)">🗑️ Usuń</button>
                             </AuthorizeView>
 
                             <AuthorizeView Roles="User">
-                                @if (animal.Status == "Do adopcji")
-                                {
-                                    <button class="btn btn-primary w-100 shadow-sm" @onclick="() => AdoptAnimal(animal.Id)">
-                                        ❤️ Adoptuj mnie!
-                                    </button>
-                                }
-                                else
-                                {
-                                    <button class="btn btn-secondary w-100" disabled>Niedostępny</button>
+                                @if(animal.Status == "Do adopcji") {
+                                    <button class="btn btn-primary btn-sm w-100 shadow-sm" @onclick="() => AdoptAnimal(animal.Id)">❤️ Adoptuj mnie!</button>
+                                } else {
+                                    <button class="btn btn-secondary btn-sm w-100" disabled>Niedostępny</button>
                                 }
                             </AuthorizeView>
-
-                            <AuthorizeView>
+                            
+                             <AuthorizeView>
                                 <NotAuthorized>
-                                    <a href="login" class="btn btn-outline-primary w-100">Zaloguj się, aby zaadoptować</a>
+                                     <a href="login" class="btn btn-outline-primary btn-sm w-100">Zaloguj się, aby zaadoptować</a>
                                 </NotAuthorized>
                             </AuthorizeView>
-
                         </div>
                     </div>
                 </div>
@@ -129,14 +123,96 @@ else
     </div>
 }
 
+@* --- MODAL (OKNO DIALOGOWE) DO DODAWANIA I EDYCJI --- *@
+@if (showModal)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header @(currentAnimal.Id == 0 ? "bg-success text-white" : "bg-warning text-dark")">
+                    <h5 class="modal-title">
+                        @(currentAnimal.Id == 0 ? "Dodaj Nowego Zwierzaka" : "Edytuj Zwierzaka")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="currentAnimal" OnValidSubmit="SaveAnimal">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Imię</label>
+                            <InputText class="form-control" @bind-Value="currentAnimal.Name" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Gatunek</label>
+                            <InputSelect class="form-select" @bind-Value="currentAnimal.Species">
+                                <option value="Pies">Pies</option>
+                                <option value="Kot">Kot</option>
+                                <option value="Inny">Inny</option>
+                            </InputSelect>
+                        </div>
+                         <div class="mb-2">
+                            <label class="form-label fw-bold">Wiek</label>
+                            <InputNumber class="form-control" @bind-Value="currentAnimal.Age" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Status</label>
+                            <InputSelect class="form-select" @bind-Value="currentAnimal.Status">
+                                <option value="Do adopcji">Do adopcji</option>
+                                <option value="Oczekujący">Oczekujący</option>
+                                <option value="Zaadoptowany">Zaadoptowany</option>
+                            </InputSelect>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Opis</label>
+                            <InputTextArea class="form-control" @bind-Value="currentAnimal.Description" />
+                        </div>
+
+                        @* --- SEKCJA ZDJĘCIA --- *@
+                        <div class="mb-3">
+                             <label class="form-label fw-bold">Zdjęcie:</label>
+                             @* InputFile: Pozwala wybrać NOWE zdjęcie *@
+                             <InputFile OnChange="HandleImageUpload" class="form-control" accept="image/png, image/jpeg, image/jpg" />
+                             <small class="text-muted">Maksymalny rozmiar: 5 MB.</small>
+
+                             @* Podgląd *@
+                             @if (!string.IsNullOrEmpty(currentAnimal.ImageUrl))
+                             {
+                                 <div class="text-center mt-3">
+                                     <p class="mb-1 text-muted small">Podgląd:</p>
+                                     <img src="@currentAnimal.ImageUrl" class="img-thumbnail" style="max-height: 150px;"
+                                          onerror="this.src='/images/default.png'" />
+                                 </div>
+                             }
+                        </div>
+                        @* ------------------------------------- *@
+
+                        <div class="modal-footer px-0 pb-0">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseModal">Anuluj</button>
+                            <button type="submit" class="btn @(currentAnimal.Id == 0 ? "btn-success" : "btn-warning")">
+                                💾 Zapisz
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<Animal>? allAnimals;
     private List<Animal>? filteredAnimals;
-
     private string message = "";
     private bool isError = false;
     private string searchText = "";
     private string selectedSpecies = "";
+    private long maxFileSize = 1024 * 1024 * 5; // Max 5MB
+
+    // ZMIENNE DO MODALA
+    private bool showModal = false;
+    private Animal currentAnimal = new(); 
 
     protected override async Task OnInitializedAsync()
     {
@@ -145,120 +221,115 @@ else
 
     private async Task LoadAnimals()
     {
-        try
-        {
-            allAnimals = await Http.GetFromJsonAsync<List<Animal>>("api/animals");
-            filteredAnimals = allAnimals;
-        }
-        catch (Exception ex)
-        {
-            message = "Błąd pobierania danych.";
-            isError = true;
-        }
-    }
-
-    private void FilterAnimals()
-    {
-        if (allAnimals == null) return;
-        var query = allAnimals.AsEnumerable();
-
-        if (!string.IsNullOrWhiteSpace(searchText))
-            query = query.Where(a => a.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase));
-
-        if (!string.IsNullOrWhiteSpace(selectedSpecies))
-            query = query.Where(a => a.Species == selectedSpecies);
-
-        filteredAnimals = query.ToList();
-    }
-
-    private void OnSpeciesChanged(ChangeEventArgs e)
-    {
-        selectedSpecies = e.Value?.ToString() ?? "";
+        allAnimals = await Http.GetFromJsonAsync<List<Animal>>("api/animals");
         FilterAnimals();
     }
 
-    private async Task AdoptAnimal(int animalId)
+    // --- LOGIKA MODALA ---
+    private void OpenAddModal()
     {
-        var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
+        // Przy dodawaniu ustawiamy domyślny obrazek
+        currentAnimal = new Animal { 
+            Species = "Pies", 
+            Status = "Do adopcji",
+            ImageUrl = "/images/default.png" // Domyślny obrazek na start
+        }; 
+        showModal = true;
+        message = "";
+    }
 
-        if (string.IsNullOrEmpty(token))
+    private void OpenEditModal(Animal animalToEdit)
+    {
+        // Płytka kopia
+        currentAnimal = new Animal
         {
-            Navigation.NavigateTo("login");
-            return;
-        }
+            Id = animalToEdit.Id,
+            Name = animalToEdit.Name,
+            Species = animalToEdit.Species,
+            Age = animalToEdit.Age,
+            Description = animalToEdit.Description,
+            ImageUrl = animalToEdit.ImageUrl,
+            Status = animalToEdit.Status,
+            DateAdded = animalToEdit.DateAdded,
+            DaysInShelter = animalToEdit.DaysInShelter
+        };
+        showModal = true;
+        message = "";
+    }
 
-        string reason = await JS.InvokeAsync<string>("prompt", "Dlaczego chcesz adoptować tego zwierzaka?");
-        if (string.IsNullOrWhiteSpace(reason)) return;
+    private void CloseModal() => showModal = false;
 
+    // --- [PRZYWRÓCONE] OBSŁUGA ZMIANY ZDJĘCIA ---
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
         try
         {
-            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            var request = new AdoptionRequest
-            {
-                AnimalId = animalId,
-                Reason = reason,
-                Status = "Oczekujący",
-                RequestDate = DateTime.Now
-            };
+            var file = e.File;
+            var format = "image/jpeg";
+            // Skalujemy zdjęcie w przeglądarce do 600x600px
+            var resizedImage = await file.RequestImageFileAsync(format, 600, 600);
+            var buffer = new byte[resizedImage.Size];
+            await resizedImage.OpenReadStream(maxFileSize).ReadAsync(buffer);
+            var base64Data = Convert.ToBase64String(buffer);
 
-            var response = await Http.PostAsJsonAsync("api/adoptionrequests", request);
-
-            if (response.IsSuccessStatusCode)
-            {
-                message = "🎉 Wniosek wysłany! Czekaj na decyzję admina.";
-                isError = false;
-
-                var animal = allAnimals?.FirstOrDefault(a => a.Id == animalId);
-                if (animal != null) animal.Status = "Oczekujący";
-                FilterAnimals();
-            }
-            else
-            {
-                // Obsługa błędu 403 Forbidden (gdyby jednak Admin próbował kliknąć)
-                if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-                {
-                    message = "Personel nie może składać wniosków adopcyjnych (zaloguj się jako User).";
-                    isError = true;
-                }
-                else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    Navigation.NavigateTo("login");
-                }
-                else
-                {
-                    message = "Błąd wysyłania wniosku.";
-                    isError = true;
-                }
-            }
+            // Nadpisujemy ImageUrl danymi Base64
+            currentAnimal.ImageUrl = $"data:{format};base64,{base64Data}";
         }
         catch (Exception ex)
         {
-            message = $"Błąd: {ex.Message}";
+            message = $"Błąd zdjęcia: {ex.Message}";
+            isError = true;
+        }
+    }
+    // ----------------------------------------------
+
+    private async Task SaveAnimal()
+    {
+        // Zabezpieczenie: jeśli ktoś wyczyścił pole obrazka, wstawiamy domyślny
+        if (string.IsNullOrEmpty(currentAnimal.ImageUrl)) 
+        {
+            currentAnimal.ImageUrl = "/images/default.png";
+        }
+
+        var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        HttpResponseMessage response;
+
+        if (currentAnimal.Id == 0)
+        {
+            response = await Http.PostAsJsonAsync("api/animals", currentAnimal);
+        }
+        else
+        {
+            response = await Http.PutAsJsonAsync($"api/animals/{currentAnimal.Id}", currentAnimal);
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            showModal = false;
+            await LoadAnimals();
+            message = "Zapisano pomyślnie!";
+            isError = false;
+        }
+        else
+        {
+            message = "Błąd zapisu.";
             isError = true;
         }
     }
 
     private async Task DeleteAnimal(int id)
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", "Czy na pewno chcesz usunąć tego zwierzaka?");
-        if (!confirmed) return;
-
+        if (!await JS.InvokeAsync<bool>("confirm", "Czy na pewno usunąć?")) return;
         var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
         Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await Http.DeleteAsync($"api/animals/{id}");
-
         if (response.IsSuccessStatusCode)
         {
-            message = "Zwierzak usunięty.";
-            isError = false;
-
-            var itemToRemove = allAnimals?.FirstOrDefault(a => a.Id == id);
-            if (itemToRemove != null)
-            {
-                allAnimals?.Remove(itemToRemove);
-                FilterAnimals();
-            }
+            await LoadAnimals();
+            message = "Usunięto zwierzaka.";
         }
         else
         {
@@ -267,15 +338,35 @@ else
         }
     }
 
-    private string GetStatusBadge(string status)
+    private async Task AdoptAnimal(int id)
     {
-        return status switch
-        {
-            "Do adopcji" => "bg-success",
-            "Oczekujący" => "bg-warning text-dark",
-            "Adoptowany" => "bg-secondary",
-            "Zaadoptowany" => "bg-secondary",
-            _ => "bg-light text-dark border"
-        };
+        var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
+        if (string.IsNullOrEmpty(token)) { Navigation.NavigateTo("login"); return; }
+        string reason = await JS.InvokeAsync<string>("prompt", "Dlaczego chcesz go adoptować?");
+        if (string.IsNullOrWhiteSpace(reason)) return;
+
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var request = new AdoptionRequest { AnimalId = id, Reason = reason, Status = "Oczekujący", RequestDate = DateTime.Now };
+        
+        var resp = await Http.PostAsJsonAsync("api/adoptionrequests", request);
+        if (resp.IsSuccessStatusCode) {
+            message = "Wniosek wysłany!";
+            await LoadAnimals();
+        } else {
+            message = "Błąd wysyłania wniosku.";
+            isError = true;
+        }
     }
+
+    private void FilterAnimals()
+    {
+        if (allAnimals == null) return;
+        var query = allAnimals.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(searchText)) query = query.Where(a => a.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(selectedSpecies)) query = query.Where(a => a.Species == selectedSpecies);
+        filteredAnimals = query.ToList();
+    }
+    private void OnSpeciesChanged(ChangeEventArgs e) { selectedSpecies = e.Value?.ToString() ?? ""; FilterAnimals(); }
+    
+    private string GetBadge(string s) => s == "Do adopcji" ? "bg-success" : (s == "Oczekujący" ? "bg-warning text-dark" : "bg-secondary");
 }

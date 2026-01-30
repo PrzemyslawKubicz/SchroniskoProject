@@ -1,7 +1,11 @@
 ﻿@page "/logs"
 @using Schronisko.Shared.Entities
 @using Microsoft.AspNetCore.Authorization
+@* ZABEZPIECZENIE: *@
+@* Ta strona jest dostępna TYLKO dla Administratora. *@
+@* Jeśli wejdzie tu Pracownik lub Zwykły User, zostanie zablokowany. *@
 @attribute [Authorize(Roles = "Admin")]
+
 @inject HttpClient Http
 
 <PageTitle>Logi Systemowe</PageTitle>
@@ -9,9 +13,11 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>📋 Dziennik Zdarzeń (Logi)</h2>
+        @* Przycisk ręcznego odświeżania (przydatne, gdy chcemy zobaczyć najnowsze akcje bez F5) *@
         <button class="btn btn-outline-primary" @onclick="LoadLogs">🔄 Odśwież</button>
     </div>
 
+    @* 1. STAN ŁADOWANIA *@
     @if (logs == null)
     {
         <div class="text-center">
@@ -21,6 +27,7 @@
     }
     else
     {
+        @* 2. TABELA DANYCH *@
         <div class="table-responsive shadow-sm rounded">
             <table class="table table-hover align-middle mb-0 bg-white">
                 <thead class="bg-light">
@@ -38,19 +45,29 @@
                             <td class="text-muted small">
                                 @log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
                             </td>
+
+                            @* KOLUMNA: UŻYTKOWNIK *@
                             <td>
+                                @* RELACJA W AKCJI: *@
+                                @* Dzięki temu, że w LogsController użyliśmy .Include(l => l.User), *@
+                                @* tutaj obiekt log.User NIE JEST nullem i możemy wyświetlić Username. *@
                                 @if (log.User != null)
                                 {
-                                    // Dowód na działanie relacji 1:N
                                     <span class="badge bg-success">👤 @log.User.Username</span>
                                 }
                                 else
                                 {
+                                    @* Jeśli User == null (np. błędne logowanie nieistniejącego konta lub user usunięty) *@
                                     <span class="badge bg-secondary">🤖 System / Anonim</span>
                                 }
                             </td>
+
                             <td class="small text-muted">@log.UserEmail</td>
+
+                            @* KOLUMNA: AKCJA *@
                             <td>
+                                @* WARUNKOWE FORMATOWANIE: *@
+                                @* Jeśli w treści logu występuje słowo "Błąd" lub "Error", kolorujemy tekst na czerwono. *@
                                 @if (log.Action.Contains("Błąd") || log.Action.Contains("Error"))
                                 {
                                     <span class="text-danger fw-bold">@log.Action</span>
@@ -71,6 +88,7 @@
 @code {
     private List<Log>? logs;
 
+    // Metoda uruchamiana przy wejściu na stronę
     protected override async Task OnInitializedAsync()
     {
         await LoadLogs();
@@ -80,11 +98,14 @@
     {
         try
         {
+            // Pobieramy logi z API (LogsController).
+            // Dzięki [Authorize(Roles="Admin")] na kontrolerze i tutaj,
+            // mamy pewność, że nikt niepowołany tego nie pobierze.
             logs = await Http.GetFromJsonAsync<List<Log>>("api/logs");
         }
         catch (Exception)
         {
-            // Ignorujemy błędy połączenia dla estetyki demo
+            // Prosta obsługa błędu (w produkcji można tu dodać np. Toast notification)
         }
     }
 }

@@ -1,18 +1,25 @@
-﻿@page "/edit-animal/{Id:int}"
+﻿@* [ZMIANA 1] Dwie ścieżki: Jedna do dodawania (bez ID), druga do edycji (z ID) *@
+@page "/edit-animal"
+@page "/edit-animal/{Id:int}"
+
 @using Schronisko.Shared.Entities
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Headers
+
 @attribute [Authorize(Roles = "Admin,Employee")]
+
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
-<PageTitle>Edytuj Zwierzaka</PageTitle>
+@* [ZMIANA 2] Dynamiczny tytuł strony *@
+<PageTitle>@(Id == null ? "Dodaj Zwierzaka" : "Edytuj Zwierzaka")</PageTitle>
 
 <div class="container mt-4" style="max-width: 600px;">
     <div class="card shadow border-0">
-        <div class="card-header bg-warning text-dark text-center py-3">
-            <h4 class="mb-0 fw-bold">Edycja Zwierzaka</h4>
+        @* [ZMIANA 3] Dynamiczny nagłówek karty (Zielony dla nowego, Żółty dla edycji) *@
+        <div class="card-header @(Id == null ? "bg-success text-white" : "bg-warning text-dark") text-center py-3">
+            <h4 class="mb-0 fw-bold">@(Id == null ? "Dodawanie Nowego Zwierzaka" : "Edycja Zwierzaka")</h4>
         </div>
         <div class="card-body p-4">
 
@@ -21,7 +28,8 @@
                 <div class="alert alert-danger">@errorMessage</div>
             }
 
-            @if (animal == null)
+            @* Jeśli ładujemy dane (tylko przy edycji) *@
+            @if (Id != null && animal == null)
             {
                 <div class="text-center">
                     <div class="spinner-border text-primary" role="status"></div>
@@ -30,7 +38,8 @@
             }
             else
             {
-                <EditForm Model="animal" OnValidSubmit="HandleUpdate">
+                @* Zmieniono nazwę funkcji na HandleSubmit (bo obsługuje i update, i create) *@
+                <EditForm Model="animal" OnValidSubmit="HandleSubmit">
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
@@ -69,14 +78,13 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Zdjęcie:</label>
-
                         <InputFile OnChange="HandleImageUpload" class="form-control" accept="image/png, image/jpeg, image/jpg" />
-                        <small class="text-muted">Maksymalny rozmiar: 5 MB. Pozostaw puste, aby zachować obecne zdjęcie.</small>
+                        <small class="text-muted">Max 5 MB. @(Id != null ? "Zostaw puste, aby zachować obecne." : "")</small>
 
                         @if (!string.IsNullOrEmpty(animal.ImageUrl))
                         {
                             <div class="text-center mt-3">
-                                <p class="mb-1 text-muted small">Aktualne zdjęcie / Podgląd:</p>
+                                <p class="mb-1 text-muted small">Podgląd:</p>
                                 <img src="@animal.ImageUrl" class="img-thumbnail" style="max-height: 200px;"
                                      onerror="this.src='/images/default.png'" />
                             </div>
@@ -84,7 +92,9 @@
                     </div>
 
                     <div class="d-grid gap-2 mt-4">
-                        <button type="submit" class="btn btn-success">💾 Zapisz zmiany</button>
+                        <button type="submit" class="btn @(Id == null ? "btn-success" : "btn-warning")">
+                            💾 @(Id == null ? "Dodaj Zwierzaka" : "Zapisz Zmiany")
+                        </button>
                         <button type="button" class="btn btn-secondary" @onclick="GoBack">Anuluj</button>
                     </div>
                 </EditForm>
@@ -94,25 +104,30 @@
 </div>
 
 @code {
+    // [ZMIANA 4] Id jest teraz nullable (int?), bo przy dodawaniu go nie ma
     [Parameter]
-    public int Id { get; set; }
+    public int? Id { get; set; }
 
-    private Animal? animal;
+    // Przy dodawaniu tworzymy nowy obiekt, żeby formularz nie był null
+    private Animal animal = new Animal { Species = "Pies", Status = "Do adopcji" };
+
     private string errorMessage = "";
-
-    // Maksymalny rozmiar pliku (5 MB)
     private long maxFileSize = 1024 * 1024 * 5;
 
     protected override async Task OnInitializedAsync()
     {
-        try
+        // [ZMIANA 5] Pobieramy dane TYLKO jeśli mamy ID (czyli edycja)
+        if (Id != null)
         {
-            animal = await Http.GetFromJsonAsync<Animal>($"api/animals/{Id}");
-        }
-        catch (Exception)
-        {
-            await JS.InvokeVoidAsync("alert", "Nie znaleziono zwierzaka!");
-            Navigation.NavigateTo("/");
+            try
+            {
+                animal = await Http.GetFromJsonAsync<Animal>($"api/animals/{Id}");
+            }
+            catch (Exception)
+            {
+                await JS.InvokeVoidAsync("alert", "Nie znaleziono zwierzaka!");
+                Navigation.NavigateTo("/");
+            }
         }
     }
 
@@ -122,21 +137,16 @@
         {
             var file = e.File;
             var format = "image/jpeg";
-
             var resizedImage = await file.RequestImageFileAsync(format, 600, 600);
-
             var buffer = new byte[resizedImage.Size];
             await resizedImage.OpenReadStream(maxFileSize).ReadAsync(buffer);
-
             var base64Data = Convert.ToBase64String(buffer);
 
-            // Nadpisujemy stare zdjęcie nowym
             if (animal != null)
             {
                 animal.ImageUrl = $"data:{format};base64,{base64Data}";
             }
-
-            errorMessage = ""; // Czyścimy błędy jeśli się udało
+            errorMessage = "";
         }
         catch (Exception ex)
         {
@@ -144,20 +154,27 @@
         }
     }
 
-    private async Task HandleUpdate()
+    // [ZMIANA 6] Logika rozdzielająca POST (Dodaj) i PUT (Edytuj)
+    private async Task HandleSubmit()
     {
-        if (animal == null) return;
-
-        // Jeśli z jakiegoś powodu ImageUrl jest pusty (użytkownik usunął link w bazie?), dajemy default
-        if (string.IsNullOrEmpty(animal.ImageUrl))
-        {
-            animal.ImageUrl = "images/default.png";
-        }
+        // Zabezpieczenie przed brakiem zdjęcia
+        if (string.IsNullOrEmpty(animal.ImageUrl)) animal.ImageUrl = "images/default.png";
 
         var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
         Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var response = await Http.PutAsJsonAsync($"api/animals/{Id}", animal);
+        HttpResponseMessage response;
+
+        if (Id == null)
+        {
+            // === SCENARIUSZ 1: DODAWANIE (CREATE) ===
+            response = await Http.PostAsJsonAsync("api/animals", animal);
+        }
+        else
+        {
+            // === SCENARIUSZ 2: EDYCJA (UPDATE) ===
+            response = await Http.PutAsJsonAsync($"api/animals/{Id}", animal);
+        }
 
         if (response.IsSuccessStatusCode)
         {
@@ -165,7 +182,7 @@
         }
         else
         {
-            errorMessage = "Błąd zapisu zmian. Spróbuj ponownie.";
+            errorMessage = "Wystąpił błąd podczas zapisywania. Sprawdź dane.";
         }
     }
 

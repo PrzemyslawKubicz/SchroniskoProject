@@ -4,17 +4,21 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @using Schronisko.Client.Auth
 
+@* Layout: Wycentrowana karta na środku ekranu (Bootstrap flexbox) *@
 <div class="d-flex justify-content-center align-items-center vh-100 bg-light">
     <div class="card shadow-lg p-4" style="width: 100%; max-width: 400px; border-radius: 15px;">
         <div class="card-body">
             <h2 class="text-center mb-4 fw-bold text-primary">Witaj ponownie! 👋</h2>
 
+            @* Wyświetlanie błędu (np. gdy ktoś poda złe hasło) *@
             @if (!string.IsNullOrEmpty(errorMessage))
             {
                 <div class="alert alert-danger text-center">@errorMessage</div>
             }
 
+            @* Formularz logowania *@
             <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+                @* Sprawdza, czy pola nie są puste (zgodnie z adnotacjami w UserLoginDto) *@
                 <DataAnnotationsValidator />
 
                 <div class="mb-3">
@@ -25,8 +29,11 @@
                 <div class="mb-3">
                     <label class="form-label fw-bold">Hasło</label>
                     <div class="input-group">
+                        @* LOGIKA POKAZYWANIA HASŁA: *@
+                        @* Zmieniamy typ inputa dynamicznie między "text" (widać) a "password" (kropki) *@
                         <InputText @bind-Value="loginModel.Password" type="@(showPassword ? "text" : "password")" class="form-control form-control-lg" placeholder="Hasło" />
 
+                        @* Przycisk "Oko" do odsłaniania hasła *@
                         <button class="btn btn-outline-secondary" type="button" @onclick="TogglePassword">
                             @(showPassword ? "👁️" : "🔒")
                         </button>
@@ -45,27 +52,46 @@
 </div>
 
 @code {
+    // Model formularza (powinien być w Shared/DTOs)
     private UserLoginDto loginModel = new UserLoginDto();
+
     private string errorMessage = "";
     private bool showPassword = false;
 
+    // Przełącznik widoczności hasła
     private void TogglePassword()
     {
         showPassword = !showPassword;
     }
 
+    // =============================================================
+    // GŁÓWNA LOGIKA LOGOWANIA
+    // =============================================================
     private async Task HandleLogin()
     {
+        // 1. Wysyłamy login i hasło do API
         var response = await Http.PostAsJsonAsync("api/auth/login", loginModel);
 
         if (response.IsSuccessStatusCode)
         {
+            // 2. Jeśli sukces -> API zwraca TOKEN JWT jako czysty tekst
             var token = await response.Content.ReadAsStringAsync();
+
+            // 3. KLUCZOWY MOMENT: Przekazujemy token do naszego CustomAuthStateProvider.
+            // Musimy zrobić rzutowanie ((CustomAuthStateProvider)...), ponieważ domyślny interfejs
+            // AuthenticationStateProvider nie posiada metody .Login(). Nasza klasa ją ma.
             await ((CustomAuthStateProvider)AuthStateProvider).Login(token);
+
+            // Metoda .Login() w AuthStateProvider zrobiła dwie rzeczy:
+            // a) Zapisała token w sessionStorage przeglądarki.
+            // b) Powiadomiła całą aplikację (NotifyAuthenticationStateChanged), że stan się zmienił.
+
+            // 4. Przekierowujemy na stronę główną (teraz menu się zmieni i pokaże opcje Admina/Usera)
             Navigation.NavigateTo("/");
         }
         else
         {
+            // Jeśli API zwróci 400 Bad Request (np. złe hasło)
             errorMessage = "Błędny login lub hasło.";
         }
     }

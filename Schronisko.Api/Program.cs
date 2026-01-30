@@ -9,22 +9,31 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// === 1. KONTROLERY  ===
-// Dodajemy obs≈Çugƒô IgnoreCycles, ≈ºeby API nie d≈Çawi≈Ço siƒô relacjami w bazie
+// ==============================================================================
+// 1. KONTENER SERWIS”W (Dependency Injection)
+// Tutaj "uczymy" aplikacjÍ, z jakich narzÍdzi ma korzystaÊ.
+// ==============================================================================
+
+// KONTROLERY + JSON
+// Dodajemy obs≥ugÍ IgnoreCycles. Dlaczego?
+// Jeúli Pies ma Wniosek, a Wniosek ma Psa, to przy wysy≥aniu JSON robi siÍ nieskoÒczona pÍtla.
+// Ta opcja mÛwi: "Jeúli juø widzia≥eú ten obiekt, nie wpisuj go drugi raz, wstaw null/id".
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    // To pozwala API wysy≈Çaƒá zagnie≈ºd≈ºone obiekty (Wniosek -> User)
-    // i zapobiega b≈Çƒôdom, je≈õli obiekty wskazujƒÖ na siebie nawzajem
     options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
 });
 
-// 2. BAZA DANYCH
+// BAZA DANYCH
+// Rejestrujemy DataContext i mÛwimy mu, øeby ≥πczy≥ siÍ z SQL Serverem
+// uøywajπc adresu (ConnectionString) zapisanego w pliku appsettings.json.
 builder.Services.AddDbContext<DataContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 3. SWAGGER
+// SWAGGER (Dokumentacja API)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options => {
+    // Konfiguracja "K≥Ûdki" w Swaggerze.
+    // DziÍki temu moøesz wkleiÊ Token JWT w przeglπdarce i testowaÊ endpointy [Authorize].
     options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
@@ -34,26 +43,31 @@ builder.Services.AddSwaggerGen(options => {
     options.OperationFilter<SecurityRequirementsOperationFilter>();
 });
 
-// 4. JWT (Uwierzytelnianie)
+// UWIERZYTELNIANIE (JWT)
+// Tutaj mÛwimy aplikacji: "Jak dostaniesz Token, to sprawdü czy pasuje do naszego tajnego klucza".
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options => {
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuerSigningKey = true,
+            ValidateIssuerSigningKey = true, // Sprawdzaj podpis (czy nikt nie podrobi≥ tokena)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8
                 .GetBytes(builder.Configuration.GetSection("AppSettings:Token").Value!)),
-            ValidateIssuer = false,
-            ValidateAudience = false
+            ValidateIssuer = false, // Upraszczamy (nie sprawdzamy kto wyda≥)
+            ValidateAudience = false // Upraszczamy (nie sprawdzamy dla kogo)
         };
     });
 
-// 5. AUTORYZACJA
+// AUTORYZACJA
+// Ustawiamy politykÍ "otwartπ" (FallbackPolicy = null).
+// Oznacza to, øe domyúlnie endpointy sπ publiczne, chyba øe damy nad nimi [Authorize].
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = null;
 });
 
-// 6. CORS
+// CORS (Cross-Origin Resource Sharing)
+// Pozwala przeglπdarce (Blazor Client na porcie np. 5000) 
+// gadaÊ z Serwerem (API na porcie np. 7000). Bez tego przeglπdarka zablokuje zapytania.
 builder.Services.AddCors(options => {
     options.AddPolicy("AllowBlazorOrigin",
         policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
@@ -61,7 +75,11 @@ builder.Services.AddCors(options => {
 
 var app = builder.Build();
 
-// === PIPELINE ===
+// ==============================================================================
+// 2. PIPELINE 
+// Tutaj decydujemy, co dzieje siÍ z kaødym zapytaniem przychodzπcym do serwera.
+// KOLEJNOå∆ MA ZNACZENIE!
+// ==============================================================================
 
 if (app.Environment.IsDevelopment())
 {
@@ -71,14 +89,16 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseCors("AllowBlazorOrigin");
+app.UseCors("AllowBlazorOrigin"); // Najpierw pozwalamy na po≥πczenie...
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseAuthentication(); // ...potem sprawdzamy KIM jesteú...
+app.UseAuthorization();  // ...a na koÒcu CZY MOØESZ tu wejúÊ.
 
-app.MapControllers();
+app.MapControllers(); // Na samym koÒcu kierujemy ruch do odpowiedniego Kontrolera.
 
-// === SEKCJA STARTOWA BAZY DANYCH ===
+// ==============================================================================
+// 3. INICJALIZACJA BAZY DANYCH (Przy starcie)
+// ==============================================================================
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -86,22 +106,25 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<DataContext>();
 
-        // To sprawia, ≈ºe EF Core uruchomi WSZYSTKIE Twoje pliki z folderu Migrations po kolei.
-        // Dziƒôki temu trafiƒÖ do bazy te≈º Triggery i Procedury!
+        // WAØNE: context.Database.Migrate()
+        // To polecenie robi dwie rzeczy:
+        // 1. Jeúli baza nie istnieje -> Tworzy jπ.
+        // 2. Jeúli baza istnieje -> Aplikuje wszystkie zaleg≥e migracje (Changes).
+        // To w≥aúnie dziÍki temu funkcje SQL i Triggery trafiajπ do bazy!
         context.Database.Migrate();
         Console.WriteLine("--> Aktualizacja bazy danych (Migracje)...");
 
-        // Seedowanie danych (Wype≈Çnienie bazy na start)
-        // Je≈õli baza jest pusta, Seed.SeedData() wstawi Admina, Usera i Zwierzaki.
+        // Seedowanie danych (Wype≥nienie bazy na start)
+        // Jeúli baza jest pusta, Seed.SeedData() wstawi Admina, Usera i Zwierzaki.
         Console.WriteLine("--> Seedowanie danych...");
         Seed.SeedData(context);
 
-        Console.WriteLine("--> GOTOWE! Baza dzia≈Ça.");
+        Console.WriteLine("--> GOTOWE! Baza dzia≥a.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"!!! B≈ÅƒÑD BAZY: {ex.Message}");
+        Console.WriteLine($"!!! B£•D BAZY: {ex.Message}");
     }
 }
 
-app.Run();
+app.Run(); // Start serwera

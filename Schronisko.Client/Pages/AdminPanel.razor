@@ -2,16 +2,23 @@
 @using Schronisko.Shared.Entities
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Headers 
+
+@* ZABEZPIECZENIE: Strona dostępna TYLKO dla Admina i Pracownika. *@
+@* Jeśli wejdzie tu zwykły User, zostanie wyrzucony (zazwyczaj na stronę NotAuthorized lub Login). *@
 @attribute [Authorize(Roles = "Admin,Employee")]
+
 @inject HttpClient Http
 @inject IJSRuntime JS
 
 <div class="container mt-4">
     <h2 class="mb-4">Panel Zarządzania</h2>
 
+    @* === SEKCJA 1: KAFELKI ZE STATYSTYKAMI === *@
+    @* Te dane pochodzą z Twojego StatsController (który używa procedury SQL). *@
     @if (stats != null)
     {
         <div class="row mb-5">
+            @* Kafelek: Zwierzęta do adopcji *@
             <div class="col-md-4">
                 <div class="card text-white bg-success mb-3 shadow">
                     <div class="card-header">🐶 Do adopcji</div>
@@ -22,6 +29,7 @@
                 </div>
             </div>
 
+            @* Kafelek: Udane adopcje *@
             <div class="col-md-4">
                 <div class="card text-white bg-primary mb-3 shadow">
                     <div class="card-header">🏠 Znalazło dom</div>
@@ -32,6 +40,7 @@
                 </div>
             </div>
 
+            @* Kafelek: Oczekujące wnioski (Decyzje) *@
             <div class="col-md-4">
                 <div class="card text-dark bg-warning mb-3 shadow">
                     <div class="card-header">⏳ Decyzje do podjęcia</div>
@@ -45,16 +54,20 @@
     }
     else
     {
+        @* Spinner ładowania, zanim dane przyjdą z API *@
         <div class="d-flex align-items-center mb-4">
             <div class="spinner-border text-secondary me-2" role="status"></div>
             <span>Ładowanie raportów...</span>
         </div>
     }
+
+    @* Powiadomienia o sukcesie/błędzie operacji *@
     @if (!string.IsNullOrEmpty(message))
     {
         <div class="alert alert-info">@message</div>
     }
 
+    @* === SEKCJA 2: TABELA WNIOSKÓW === *@
     <h4 class="mb-3">Lista Wniosków Adopcyjnych</h4>
 
     @if (requests == null)
@@ -84,16 +97,21 @@
                 {
                     <tr>
                         <td>@req.RequestDate.ToShortDateString()</td>
+                        
+                        @* Kolumna: ZWIERZĘ *@
                         <td>
+                            @* Sprawdzamy null, bo pies mógł zostać usunięty z bazy, a wniosek został *@
                             @if (req.Animal != null)
                             {
                                 <strong>@req.Animal.Name</strong> <span class="text-muted">(@req.Animal.Species)</span>
                             }
                             else
                             {
-                                <span>(Pies usunięty)</span>
+                                <span class="text-muted text-decoration-line-through">(Zwierze usunięte)</span>
                             }
                         </td>
+
+                        @* Kolumna: KANDYDAT *@
                         <td>
                             @if (req.User != null)
                             {
@@ -105,11 +123,17 @@
                                 <span class="text-danger">Nieznany (ID: @req.UserId)</span>
                             }
                         </td>
+
                         <td>@req.Reason</td>
+
+                        @* Kolumna: STATUS (Kolorowa etykieta) *@
                         <td>
                             <span class="badge @GetBadgeClass(req.Status)">@req.Status</span>
                         </td>
+
+                        @* Kolumna: AKCJE (Przyciski) *@
                         <td>
+                            @* Pokazujemy przyciski TYLKO jeśli wniosek czeka na decyzję *@
                             @if (req.Status == "Oczekujący" || req.Status == "Pending")
                             {
                                 <button class="btn btn-success btn-sm me-2" @onclick='() => UpdateStatus(req.Id, "Zatwierdzony")'>✅ Zatwierdź</button>
@@ -129,7 +153,7 @@
 
 @code {
     private List<AdoptionRequest>? requests;
-    private ShelterStatsDto? stats; // Zmienna na raporty
+    private ShelterStatsDto? stats; // Zmienna na raporty (statystyki)
     private string message = "";
 
     protected override async Task OnInitializedAsync()
@@ -137,22 +161,26 @@
         await LoadData();
     }
 
+    // =============================================================
+    // ŁADOWANIE DANYCH (Wywoływane przy starcie i po każdej zmianie)
+    // =============================================================
     private async Task LoadData()
     {
         try
         {
-            // Pobieramy token, bo api/stats i api/requests są chronione
+            // 1. Autoryzacja: Pobieramy token z pamięci przeglądarki.
+            // Musimy go dodać do nagłówka, bo endpointy /api/stats i /api/requests są chronione!
             var token = await JS.InvokeAsync<string>("sessionStorage.getItem", "authToken");
             if (!string.IsNullOrEmpty(token))
             {
                 Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            // 1. Pobierz listę wniosków
+            // 2. Pobierz listę wszystkich wniosków (AdoptionRequestsController)
             requests = await Http.GetFromJsonAsync<List<AdoptionRequest>>("api/adoptionrequests");
 
-            // 2. Pobierz RAPORTY (Statystyki)
-            // To wywołuje Twój StatsController, który korzysta z procedury SQL
+            // 3. Pobierz STATYSTYKI (StatsController -> Procedura SQL)
+            // Dzięki temu kafelki na górze strony pokażą aktualne liczby.
             stats = await Http.GetFromJsonAsync<ShelterStatsDto>("api/stats");
         }
         catch (Exception ex)
@@ -161,16 +189,24 @@
         }
     }
 
+    // =============================================================
+    // ZMIANA STATUSU (Zatwierdź / Odrzuć)
+    // =============================================================
     private async Task UpdateStatus(int id, string status)
     {
         try
         {
+            // Wysyłamy zapytanie PUT do API z nowym statusem (np. "Zatwierdzony")
             var response = await Http.PutAsJsonAsync($"api/adoptionrequests/{id}", status);
 
             if (response.IsSuccessStatusCode)
             {
                 message = $"Status zmieniony na: {status}";
-                // Odśwież wszystko (wnioski i liczniki w raporcie)
+                
+                // KLUCZOWE: Ponowne załadowanie danych!
+                // Dlaczego? Bo jeśli zatwierdziliśmy wniosek, to:
+                // 1. Status wniosku się zmienił (tabela musi się odświeżyć).
+                // 2. Status psa zmienił się na "Adoptowany" (statystyki na kafelkach muszą się zmienić!).
                 await LoadData();
             }
             else
@@ -184,21 +220,22 @@
         }
     }
 
+    // Pomocnicza funkcja do kolorowania statusów
     private string GetBadgeClass(string status)
     {
         return status switch
         {
-            "Zatwierdzony" => "bg-success",
+            "Zatwierdzony" => "bg-success", // Zielony
             "Approved" => "bg-success",
-            "Odrzucony" => "bg-danger",
+            "Odrzucony" => "bg-danger",     // Czerwony
             "Rejected" => "bg-danger",
-            "Oczekujący" => "bg-warning text-dark",
+            "Oczekujący" => "bg-warning text-dark", // Żółty
             "Pending" => "bg-warning text-dark",
-            _ => "bg-secondary"
+            _ => "bg-secondary"             // Szary (nieznany)
         };
     }
 
-    // Klasa pomocnicza (DTO) do odbioru statystyk z API
+    // Klasa DTO (Data Transfer Object) - musi pasować do tego, co zwraca StatsController
     public class ShelterStatsDto
     {
         public int AvailableCount { get; set; }

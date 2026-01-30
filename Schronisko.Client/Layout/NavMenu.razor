@@ -19,16 +19,11 @@
             </NavLink>
         </div>
 
+        @* Tylko Dashboard - bo edycja jest na Home *@
         <AuthorizeView Roles="Admin,Employee">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="admin-dashboard">
                     <span class="bi bi-speedometer2" aria-hidden="true"></span> Panel Zarządzania
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="add-animal">
-                    <span class="bi bi-plus-circle" aria-hidden="true"></span> Dodaj Zwierzaka
                 </NavLink>
             </div>
         </AuthorizeView>

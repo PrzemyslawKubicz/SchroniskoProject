@@ -8,12 +8,15 @@
         <div class="card-body">
             <h3 class="text-center mb-4">Rejestracja</h3>
 
+            @* Wyświetlanie błędów (np. "Taki e-mail już istnieje") *@
             @if (!string.IsNullOrEmpty(errorMessage))
             {
                 <div class="alert alert-danger">@errorMessage</div>
             }
 
+            @* Formularz rejestracji *@
             <EditForm Model="user" OnValidSubmit="HandleRegister">
+                @* Uruchamia walidację na podstawie adnotacji w klasie User (np. [Required]) *@
                 <DataAnnotationsValidator />
                 <ValidationSummary />
 
@@ -30,7 +33,11 @@
                 <div class="mb-3">
                     <label class="form-label fw-bold">Hasło</label>
                     <div class="input-group">
+                        @* LOGIKA HASŁA: *@
+                        @* Zmienna 'password' jest tymczasowa, przepisujemy ją do modelu dopiero przy wysyłce *@
+                        @* type="@(...)" zmienia input z kropek (password) na tekst (text) *@
                         <InputText @bind-Value="password" type="@(showPassword ? "text" : "password")" class="form-control form-control-lg" />
+
                         <button class="btn btn-outline-secondary" type="button" @onclick="TogglePassword">
                             @(showPassword ? "👁️" : "🔒")
                         </button>
@@ -48,17 +55,21 @@
 </div>
 
 @code {
-    // Używamy klasy UserDto, żeby przesłać też czyste hasło
+    // --- LOKALNE DTO (Data Transfer Object) ---
+    // Dlaczego to tu jest?
+    // Oryginalna klasa 'User' ma pole PasswordHash (zaszyfrowane).
+    // My w formularzu potrzebujemy zwykłego pola 'Password' (tekst jawny).
+    // Dziedziczymy po User, żeby zachować pola Username/Email i dodajemy Password.
     public class UserDto : User
     {
         public string Password { get; set; } = string.Empty;
     }
 
     private UserDto user = new UserDto();
-    private string password = ""; // Tymczasowe pole na hasło
+    private string password = ""; // Zmienna pomocnicza do wiązania z inputem
     private string errorMessage = "";
 
-    // Zmienna do sterowania podglądem hasła
+    // Zmienna do sterowania ikoną oka i typem pola hasła
     private bool showPassword = false;
 
     private void TogglePassword()
@@ -68,15 +79,20 @@
 
     private async Task HandleRegister()
     {
-        user.Password = password; // Przepisujemy hasło do modelu
+        // Przepisujemy hasło z inputa do obiektu DTO
+        user.Password = password;
 
+        // Wysyłamy dane do AuthController.cs -> metoda Register
         var response = await Http.PostAsJsonAsync("api/auth/register", user);
+
         if (response.IsSuccessStatusCode)
         {
+            // Sukces -> Przekieruj do logowania
             Navigation.NavigateTo("login");
         }
         else
         {
+            // Błąd -> Wyświetl komunikat z API (np. "Użytkownik już istnieje")
             errorMessage = await response.Content.ReadAsStringAsync();
         }
     }
